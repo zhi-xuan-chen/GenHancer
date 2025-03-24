@@ -1,14 +1,10 @@
 import os
-import clip
-from clip import load
 import csv
 from PIL import Image
 import torch
 from tqdm import tqdm
 import json
 from transformers import CLIPVisionModel, CLIPModel, CLIPImageProcessor, CLIPTokenizer
-import argparse
-
 
 
 def benchmark_model(processor, tokenizer, model, benchmark_dir, device="cpu"):

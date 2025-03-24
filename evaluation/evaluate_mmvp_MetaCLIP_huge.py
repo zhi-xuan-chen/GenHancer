@@ -1,6 +1,4 @@
 import os
-import clip
-from clip import load
 import csv
 from PIL import Image
 import torch
