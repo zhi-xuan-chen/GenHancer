@@ -1,13 +1,13 @@
 # Imperfect Generative Models are Secretly Strong Vision-Centric Enhancers
 
 **[Shijie Ma<sup>1,2</sup>](https://mashijie1028.github.io/), 
-[Yuying Ge<sup>1 &#9993;</sup>](https://geyuying.github.io/), 
+[Yuying Ge<sup>1,&#9993;</sup>](https://geyuying.github.io/), 
 [Teng Wang<sup>1</sup>](http://ttengwang.com/), 
 [Yuxin Guo<sup>1,2</sup>](https://scholar.google.com/citations?user=x_0spxgAAAAJ&hl=en), 
 [Yixiao Ge<sup>1</sup>](https://geyixiao.com/), 
 [Ying Shan<sup>1</sup>](https://scholar.google.com/citations?user=4oXBp9UAAAAJ&hl=en)**
 <br>
-<sup>1</sup>ARC Lab, Tencent PCG
+<sup>1</sup>ARC Lab, Tencent PCG, 
 <sup>2</sup>Institute of Automation, CAS
 <br>
 
