@@ -1,4 +1,4 @@
-# Imperfect Generative Models are Secretly Strong Vision-Centric Enhancers
+# GenHancer: Imperfect Generative Models are Secretly Strong Vision-Centric Enhancers
 
 **[Shijie Ma<sup>1,2</sup>](https://mashijie1028.github.io/), 
 [Yuying Ge<sup>1,&#9993;</sup>](https://geyuying.github.io/), 
@@ -12,8 +12,8 @@
 <br>
 
 <a href='https://arxiv.org/abs/2403.04272'><img src='https://img.shields.io/badge/ArXiv-2503.TODO-red'></a> 
-<a href='https://mashijie1028.github.io/gen4rep/'><img src='https://img.shields.io/badge/Project-Page-Green'></a>
-<a href='https://huggingface.co/msj9817/Gen4Rep/'><img src='https://img.shields.io/badge/Model-Huggingface-yellow'></a>
+<a href='https://mashijie1028.github.io/GenHancer/'><img src='https://img.shields.io/badge/Project-Page-Green'></a>
+<a href='https://huggingface.co/msj9817/GenHancer/'><img src='https://img.shields.io/badge/Model-Huggingface-yellow'></a>
 
 
 
@@ -33,11 +33,36 @@ We propose a two-stage post-training method to enhance CLIP ViT's fine-grained v
 
 
 
+
+> [!Important]
+>
+> We empirically found that, for visual representations, a *visually* perfect generative model is not optimal and not necessary. 
+>
+> Our method only employs lightweight generative models and does not require any pre-trained weights, which is efficient and  could avoid potential privacy and copyright issues.
+
+
+
+
 ## News
 
 * [2025-03-24] Release evaluation codes.
-* [2025-03-24] Release models weights on [Huggingface🤗](https://huggingface.co/msj9817/Gen4Rep/).
+* [2025-03-24] Release models weights on [Huggingface🤗](https://huggingface.co/msj9817/GenHancer/).
 * [2025-03-24] Release the [project page](https://mashijie1028.github.io/gen4rep/) of this repo.
+
+
+
+## Released Weights
+
+We release the enhanced CLIP weights  on [Huggingface🤗](https://huggingface.co/msj9817/GenHancer/).
+
+| CLIP Backbone           | MMVP-VLM (original) | MMVP-VLM (Ours) |                             Link                             |
+| ----------------------- | :-----------------: | :-------------: | :----------------------------------------------------------: |
+| OpenAICLIP ViT-L-14@224 |        19.3         |      31.9       | [🤗](https://huggingface.co/msj9817/GenHancer/tree/main/OpenAICLIP/clip-vit-large-patch14) |
+| OpenAICLIP ViT-L-14@336 |        20.0         |      29.6       | [🤗](https://huggingface.co/msj9817/GenHancer/tree/main/OpenAICLIP/clip-vit-large-patch14-336) |
+| MetaCLIP ViT-L-14@224   |        23.7         |      31.9       | [🤗](https://huggingface.co/msj9817/GenHancer/tree/main/MetaCLIP/metaclip-l14-fullcc2.5b) |
+| MetaCLIP ViT-H-14@224   |        25.2         |      37.0       | [🤗](https://huggingface.co/msj9817/GenHancer/tree/main/MetaCLIP/metaclip-h14-fullcc2.5b) |
+| SigLIP ViT-SO-14@224    |        37.8         |      42.2       | [🤗](https://huggingface.co/msj9817/GenHancer/tree/main/SigLIP/siglip-so400m-patch14-224) |
+| SigLIP ViT-SO-14@384    |        37.0         |      40.0       | [🤗](https://huggingface.co/msj9817/GenHancer/tree/main/SigLIP/siglip-so400m-patch14-384) |
 
 
 
@@ -63,8 +88,8 @@ This repository is under the [Apache 2 License](https://github.com/mashijie1028/
 ## BibTeX
 
 ```
-@article{ma2025genrep,
-      title={Imperfect Generative Models are Secretly Strong Vision-Centric Enhancers},
+@article{ma2025genhancer,
+      title={GenHancer: Imperfect Generative Models are Secretly Strong Vision-Centric Enhancers},
       author={Ma, Shijie and Ge, Yuying and Wang, Teng and Guo, Yuxin and Ge, Yixiao and Shan, Ying},
       journal={arXiv preprint arXiv:2503.TODO},
       year={2025}
