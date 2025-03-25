@@ -56,7 +56,7 @@ We propose a two-stage post-training method to enhance CLIP ViT's fine-grained v
 We release the enhanced CLIP weights  on [Huggingface🤗](https://huggingface.co/msj9817/GenHancer/).
 
 | CLIP Backbone           | MMVP-VLM (original) | MMVP-VLM (Ours) |                             Link                             |
-| ----------------------- | :-----------------: | :-------------: | :----------------------------------------------------------: |
+| :---------------------- | :-----------------: | :-------------: | :----------------------------------------------------------: |
 | OpenAICLIP ViT-L-14@224 |        19.3         |      31.9       | [🤗](https://huggingface.co/msj9817/GenHancer/tree/main/OpenAICLIP/clip-vit-large-patch14) |
 | OpenAICLIP ViT-L-14@336 |        20.0         |      29.6       | [🤗](https://huggingface.co/msj9817/GenHancer/tree/main/OpenAICLIP/clip-vit-large-patch14-336) |
 | MetaCLIP ViT-L-14@224   |        23.7         |      31.9       | [🤗](https://huggingface.co/msj9817/GenHancer/tree/main/MetaCLIP/metaclip-l14-fullcc2.5b) |
