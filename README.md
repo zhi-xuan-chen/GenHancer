@@ -17,7 +17,34 @@
 
 
 
-## Introduction
+## ⚡ TL;DR
+
+How do generative models effectively help discriminative models?
+
+We present in-depth explorations and propose a novel two-stage post-training strategy to enhance CLIP ViT's visual representations.
+
+Our method is applicable to both continuous and discrete denoiser without the requirement for pre-trained weights.
+
+
+
+## 📅 News
+
+* [2025-03-26] Training codes with continuous denoisers are released! 🔥🔥🔥
+* [2025-03-26] arXiv paper is made publicly available.
+* [2025-03-24] Release evaluation codes. 🔥
+* [2025-03-24] Release models weights on [Huggingface🤗](https://huggingface.co/msj9817/GenHancer/). 🔥🔥🔥
+* [2025-03-24] Release the [project page](https://mashijie1028.github.io/gen4rep/) of this repo.
+
+
+
+## 🔜 TODOs
+
+- [x] Release training codes of continuous denoisers.
+- [ ] Release training codes of discrete denoisers.
+
+
+
+## 🔎 Introduction
 
 Recent works demonstrate the feasibility of enhancing visual representations with generative models, where generative models take visual tokens as conditions and perform reconstruction. However, the underlying principle remains underexplored.
 
@@ -38,25 +65,17 @@ We propose a two-stage post-training method to enhance CLIP ViT's fine-grained v
 >
 > We empirically found that, for visual representations, a *visually* perfect generative model is not optimal and not necessary. 
 >
-> Our method only employs lightweight generative models and does not require any pre-trained weights, which is efficient and  could avoid potential privacy and copyright issues.
+> Our method only employs lightweight generative models and does NOT require any pre-trained weights, which is efficient and  could avoid potential privacy and copyright issues.
 
 
 
 
-## News
 
-* [2025-03-24] ArXiv paper is made publicly available.
-* [2025-03-24] Release evaluation codes.
-* [2025-03-24] Release models weights on [Huggingface🤗](https://huggingface.co/msj9817/GenHancer/).
-* [2025-03-24] Release the [project page](https://mashijie1028.github.io/gen4rep/) of this repo.
-
-
-
-## Released Weights
+##  ⭐ Released Weights
 
 We release the enhanced CLIP weights  on [Huggingface🤗](https://huggingface.co/msj9817/GenHancer/).
 
-| CLIP Backbone           | MMVP-VLM (original) | MMVP-VLM (Ours) |                             Link                             |
+| CLIP Backbone           | MMVP-VLM (Original) | MMVP-VLM (Ours) |                             Link                             |
 | :---------------------- | :-----------------: | :-------------: | :----------------------------------------------------------: |
 | OpenAICLIP ViT-L-14@224 |        19.3         |      31.9       | [🤗](https://huggingface.co/msj9817/GenHancer/tree/main/OpenAICLIP/clip-vit-large-patch14) |
 | OpenAICLIP ViT-L-14@336 |        20.0         |      29.6       | [🤗](https://huggingface.co/msj9817/GenHancer/tree/main/OpenAICLIP/clip-vit-large-patch14-336) |
@@ -67,26 +86,43 @@ We release the enhanced CLIP weights  on [Huggingface🤗](https://huggingface.c
 
 
 
-## TODOs
+## 🏃 Training
 
-- [ ] Release training code of continuous denoisers.
-- [ ] Release training code of discrete denoisers.
-
+Please come into the corresponding subfolder for more details.
 
 
-## Acknowledgements
+
+## 📏 Evaluation
+
+Please first download the benchmark [MMVP-VLM](https://huggingface.co/datasets/MMVP/MMVP_VLM).
+
+We provide evaluation scripts of six CLIP backbones. The example of OpenAICLIP@224 is as follows: 
+
+```shell
+python evaluation/evaluate_mmvp_OpenAICLIP_224.py --benchmark_dir 'YOUR_MMVP_VLM_PATH' --vision_tower_name 'YOUR_VISION_TOWER'
+```
+
+> [!note]
+>
+> Please specify `--vision_tower_name` as your trained CLIP model, which is conventionally saved via `save_pretrained()`.
+>
+> If you want to evaluation the official CLIP model like OpenAICLIP@224, you could specify `--vision_tower_name` as `openai/clip-vit-large-patch14`.
+
+
+
+## 🤗 Acknowledgements
 
 When building the codebase of continuous denosiers, we refer to [x-flux](https://github.com/XLabs-AI/x-flux). Thanks for their wonderful project. Notably, we do NOT use their pre-trained weights.
 
 
 
-## License
+## 📜 License
 
 This repository is under the [Apache 2 License](https://github.com/mashijie1028/Gen4Rep/blob/main/LICENSE).
 
 
 
-## BibTeX
+## 📚 BibTeX
 
 ```
 @article{ma2025genhancer,
@@ -99,7 +135,7 @@ This repository is under the [Apache 2 License](https://github.com/mashijie1028/
 
 
 
-## Contact
+## 📧 Contact
 
 If you have further questions, feel free to contact me: mashijie9817@gmail.com
 
