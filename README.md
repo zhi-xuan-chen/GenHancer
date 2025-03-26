@@ -11,7 +11,7 @@
 <sup>2</sup>Institute of Automation, CAS
 <br>
 
-<a href='https://arxiv.org/abs/2403.04272'><img src='https://img.shields.io/badge/ArXiv-2503.TODO-red'></a> 
+<a href='https://arxiv.org/abs/2503.19480'><img src='https://img.shields.io/badge/ArXiv-2503.19480-red'></a> 
 <a href='https://mashijie1028.github.io/GenHancer/'><img src='https://img.shields.io/badge/Project-Page-Green'></a>
 <a href='https://huggingface.co/msj9817/GenHancer/'><img src='https://img.shields.io/badge/Model-Huggingface-yellow'></a>
 
@@ -45,6 +45,7 @@ We propose a two-stage post-training method to enhance CLIP ViT's fine-grained v
 
 ## News
 
+* [2025-03-24] ArXiv paper is made publicly available.
 * [2025-03-24] Release evaluation codes.
 * [2025-03-24] Release models weights on [Huggingface🤗](https://huggingface.co/msj9817/GenHancer/).
 * [2025-03-24] Release the [project page](https://mashijie1028.github.io/gen4rep/) of this repo.
@@ -89,10 +90,10 @@ This repository is under the [Apache 2 License](https://github.com/mashijie1028/
 
 ```
 @article{ma2025genhancer,
-      title={GenHancer: Imperfect Generative Models are Secretly Strong Vision-Centric Enhancers},
-      author={Ma, Shijie and Ge, Yuying and Wang, Teng and Guo, Yuxin and Ge, Yixiao and Shan, Ying},
-      journal={arXiv preprint arXiv:2503.TODO},
-      year={2025}
+	title={GenHancer: Imperfect Generative Models are Secretly Strong Vision-Centric Enhancers},
+	author={Ma, Shijie and Ge, Yuying and Wang, Teng and Guo, Yuxin and Ge, Yixiao and Shan, Ying},
+	journal={arXiv preprint arXiv:2503.19480},
+	year={2025}
 }
 ```
 
