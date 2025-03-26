@@ -1,0 +1,3 @@
+export AE="/group/40034/jasonsjma/models_hf/FLUX.1-dev/ae.safetensors"
+
+accelerate launch --config_file "train_configs/accelerate_config.yaml" train_SigLIP_stage2_all.py --config "train_configs/test_SigLIP_384_stage2_all.yaml"
