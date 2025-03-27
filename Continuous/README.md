@@ -67,7 +67,7 @@ bash train_scripts/scripts_train_SigLIP_384_stage1.sh
 
 ### Stage-2
 
-In Stage-1, we mainly tune the CLIP model, while we empirically found that whether to freeze the projector and denoiser has little impact on the results.
+In Stage-2, we mainly tune the CLIP model, while we empirically found that whether to freeze the projector and denoiser has little impact on the results.
 
 Please specify `load_dir` as the saved directory of Stage-1 in `train_configs/*.yaml`.
 
