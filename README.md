@@ -88,7 +88,11 @@ We release the enhanced CLIP weights  on [Huggingface🤗](https://huggingface.c
 
 ## 🏃 Training
 
-Please come into the corresponding subfolder for more details.
+Please come into the corresponding directories for more details.
+
+For the continuous denoiser, naviagte into [Continuous](https://github.com/mashijie1028/GenHancer/tree/main/Continuous).
+
+For the discrete denoiser, naviagte into [Discrete](https://github.com/mashijie1028/GenHancer/tree/main/Discrete).
 
 
 
@@ -106,7 +110,7 @@ python evaluation/evaluate_mmvp_OpenAICLIP_224.py --benchmark_dir 'YOUR_MMVP_VLM
 >
 > Please specify `--vision_tower_name` as your trained CLIP model, which is conventionally saved via `save_pretrained()`.
 >
-> If you want to evaluation the official CLIP model like OpenAICLIP@224, you could specify `--vision_tower_name` as `openai/clip-vit-large-patch14`.
+> If you want to evaluation the official CLIP model like OpenAICLIP@224, you could specify `--vision_tower_name` as the official `hf_repo_id`, *e.g.,* `openai/clip-vit-large-patch14`.
 
 
 
