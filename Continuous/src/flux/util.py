@@ -209,65 +209,18 @@ def load_from_repo_id(repo_id, checkpoint_name):
 
 
 def load_flow_model(name: str, device: str | torch.device = "cuda", hf_download: bool = True):
-    # Loading Flux
-    # print("Init model")
-    # ckpt_path = configs[name].ckpt_path
-    # if (
-    #     ckpt_path is None
-    #     and configs[name].repo_id is not None
-    #     and configs[name].repo_flow is not None
-    #     and hf_download
-    # ):
-    #     ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_flow)
 
-    with torch.device("meta" if ckpt_path is not None else device):
-        model = Flux(configs[name].params).to(torch.bfloat16)
+    model = Flux(configs[name].params).to(torch.bfloat16)
 
-    if ckpt_path is not None:
-        print("Loading checkpoint")
-        # load_sft doesn't support torch.device
-        sd = load_sft(ckpt_path, device=str(device))
-        missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
-        print_load_warning(missing, unexpected)
     return model
 
 
 def load_flow_model2(name: str, device: str | torch.device = "cuda", hf_download: bool = True):
-    # Loading Flux
-    # print("Init model")
-    # ckpt_path = configs[name].ckpt_path
-    # if (
-    #     ckpt_path is None
-    #     and configs[name].repo_id is not None
-    #     and configs[name].repo_flow is not None
-    #     and hf_download
-    # ):
-    #     ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_flow.replace("sft", "safetensors"))
-
-    # with torch.device("meta" if ckpt_path is not None else device):
-    #     model = Flux(configs[name].params)
-
-    # if ckpt_path is not None:
-    #     print("Loading checkpoint")
-    #     # load_sft doesn't support torch.device
-    #     sd = load_sft(ckpt_path, device=str(device))
-    #     missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
-    #     print_load_warning(missing, unexpected)
 
     print("Random init flux...")
     model = Flux(configs[name].params)
 
     return model
-
-
-def load_t5(device: str | torch.device = "cuda", max_length: int = 512) -> HFEmbedder:
-    # max length 64, 128, 256 and 512 should work (if your sequence is short enough)
-    return HFEmbedder("xlabs-ai/xflux_text_encoders", max_length=max_length, torch_dtype=torch.bfloat16).to(device)
-
-
-def load_clip(device: str | torch.device = "cuda") -> HFEmbedder:
-    # return HFEmbedder("openai/clip-vit-large-patch14", max_length=77, torch_dtype=torch.bfloat16).to(device)
-    return HFEmbedder("/group/40034/jasonsjma/models_hf/clip-vit-large-patch14", max_length=77, torch_dtype=torch.bfloat16).to(device)
 
 
 
@@ -291,46 +244,3 @@ def load_ae(name: str, device: str | torch.device = "cuda", hf_download: bool = 
         missing, unexpected = ae.load_state_dict(sd, strict=False, assign=True)
         print_load_warning(missing, unexpected)
     return ae
-
-
-class WatermarkEmbedder:
-    def __init__(self, watermark):
-        self.watermark = watermark
-        self.num_bits = len(WATERMARK_BITS)
-        self.encoder = WatermarkEncoder()
-        self.encoder.set_watermark("bits", self.watermark)
-
-    def __call__(self, image: torch.Tensor) -> torch.Tensor:
-        """
-        Adds a predefined watermark to the input image
-
-        Args:
-            image: ([N,] B, RGB, H, W) in range [-1, 1]
-
-        Returns:
-            same as input but watermarked
-        """
-        image = 0.5 * image + 0.5
-        squeeze = len(image.shape) == 4
-        if squeeze:
-            image = image[None, ...]
-        n = image.shape[0]
-        image_np = rearrange((255 * image).detach().cpu(), "n b c h w -> (n b) h w c").numpy()[:, :, :, ::-1]
-        # torch (b, c, h, w) in [0, 1] -> numpy (b, h, w, c) [0, 255]
-        # watermarking libary expects input as cv2 BGR format
-        for k in range(image_np.shape[0]):
-            image_np[k] = self.encoder.encode(image_np[k], "dwtDct")
-        image = torch.from_numpy(rearrange(image_np[:, :, :, ::-1], "(n b) h w c -> n b c h w", n=n)).to(
-            image.device
-        )
-        image = torch.clamp(image / 255, min=0.0, max=1.0)
-        if squeeze:
-            image = image[0]
-        image = 2 * image - 1
-        return image
-
-
-# A fixed 48-bit message that was choosen at random
-WATERMARK_MESSAGE = 0b001010101111111010000111100111001111010100101110
-# bin(x)[2:] gives bits of x as str, use int to convert them to 0/1
-WATERMARK_BITS = [int(bit) for bit in bin(WATERMARK_MESSAGE)[2:]]

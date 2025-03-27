@@ -12,15 +12,13 @@ from torchvision import transforms
 import matplotlib.pyplot as plt
 
 
-from src.flux.sampling import denoise_controlnet, get_noise, get_schedule, prepare, unpack   # do not import denoise
-from src.flux.model import Flux   # new import flux
+from src.flux.sampling import denoise_controlnet, get_noise, get_schedule, prepare, unpack
+from src.flux.model import Flux
 from src.flux.util import (
     load_ae,
     load_clip,
     load_flow_model,
     load_t5,
-    load_controlnet,
-    Annotator,
     get_lora_rank,
     load_checkpoint
 )
@@ -246,14 +244,14 @@ if __name__ == "__main__":
 
     print('loading projection params...')
     load_path_project_clip = os.path.join(load_dir, f"checkpoint-project-clip-{load_step}.bin")
-    clip_vis.project_clip.load_state_dict(torch.load(load_path_project_clip, map_location=torch.device('cpu')))   # NOTE!!! map cpu
+    clip_vis.project_clip.load_state_dict(torch.load(load_path_project_clip, map_location=torch.device('cpu')))
     load_path_project_t5 = os.path.join(load_dir, f"checkpoint-project-t5-{load_step}.bin")
-    clip_vis.project_t5.load_state_dict(torch.load(load_path_project_t5, map_location=torch.device('cpu')))   # NOTE!!! map cpu
+    clip_vis.project_t5.load_state_dict(torch.load(load_path_project_t5, map_location=torch.device('cpu')))
     print('loading successfully!')
 
     print('loading dit params...')
     load_path_dit = os.path.join(load_dir, f"checkpoint-dit-{load_step}.bin")
-    dit.load_state_dict(torch.load(load_path_dit, map_location=torch.device('cpu')))   # NOTE!!! map cpu
+    dit.load_state_dict(torch.load(load_path_dit, map_location=torch.device('cpu')))
     print('loading successfully!')
 
     clip_vis = clip_vis.to(torch.bfloat16)
