@@ -90,9 +90,9 @@ We release the enhanced CLIP weights  on [Huggingface🤗](https://huggingface.c
 
 Please come into the corresponding directories for more details.
 
-For the continuous denoiser, naviagte into [Continuous](https://github.com/mashijie1028/GenHancer/tree/main/Continuous).
+For the continuous denoiser, navigate into [Continuous](https://github.com/mashijie1028/GenHancer/tree/main/Continuous).
 
-For the discrete denoiser, naviagte into [Discrete](https://github.com/mashijie1028/GenHancer/tree/main/Discrete).
+For the discrete denoiser, navigate into [Discrete](https://github.com/mashijie1028/GenHancer/tree/main/Discrete).
 
 
 
