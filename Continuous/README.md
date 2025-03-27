@@ -22,7 +22,10 @@
 
 2. Install packages:
 
-   ```
+   ```shell
+   conda create -n continuous python=3.10 -y
+   conda activate continuous
+   pip install --upgrade pip  # enable PEP 660 support
    pip install -r requirements.txt
    ```
 
