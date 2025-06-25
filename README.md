@@ -1,4 +1,4 @@
-# GenHancer: Imperfect Generative Models are Secretly Strong Vision-Centric Enhancers
+# GenHancer: Imperfect Generative Models are Secretly Strong Vision-Centric Enhancers (ICCV 2025)
 
 **[Shijie Ma<sup>1,2</sup>](https://mashijie1028.github.io/), 
 [Yuying Ge<sup>1,&#9993;</sup>](https://geyuying.github.io/), 
@@ -11,6 +11,7 @@
 <sup>2</sup>Institute of Automation, CAS
 <br>
 
+<a href="https://iccv.thecvf.com/Conferences/2025"><img src="https://img.shields.io/badge/-ICCV%202025-68488b"></a>
 <a href='https://arxiv.org/abs/2503.19480'><img src='https://img.shields.io/badge/ArXiv-2503.19480-red'></a> 
 <a href='https://mashijie1028.github.io/GenHancer/'><img src='https://img.shields.io/badge/Project-Page-Green'></a>
 <a href='https://huggingface.co/msj9817/GenHancer/'><img src='https://img.shields.io/badge/Model-Huggingface-yellow'></a>
@@ -48,7 +49,7 @@ Our method is applicable to both continuous and discrete denoiser without the re
 
 Recent works demonstrate the feasibility of enhancing visual representations with generative models, where generative models take visual tokens as conditions and perform reconstruction. However, the underlying principle remains underexplored.
 
-We empirically reveal that perfect generation (reconstruction) does not always yield desirable visual representasions, as shown below:
+We empirically reveal that perfect generation (reconstruction) does not always yield desirable visual representations, as shown below:
 
 ![teaser](assets/teaser.jpg)
 
