@@ -1,3 +1,5 @@
-export AE="/group/40034/jasonsjma/models_hf/FLUX.1-dev/ae.safetensors"
-
-accelerate launch --config_file "train_configs/accelerate_config.yaml" train_SigLIP_stage1.py --config "train_configs/test_SigLIP_384_stage1.yaml"
+export AE="/jhcnas5/chenzhixuan/checkpoints/GenHancer/ae.safetensors"
+export WANDB_PROJECT="GenHancer"
+export WANDB_ENTITY="zchenhi"
+export CUDA_VISIBLE_DEVICES=0,5
+accelerate launch --config_file "/home/chenzhixuan/Workspace/GenHancer/Continuous/train_configs/accelerate_config.yaml" --num_processes 2 /home/chenzhixuan/Workspace/GenHancer/Continuous/train_SigLIP_stage1.py --config "/home/chenzhixuan/Workspace/GenHancer/Continuous/train_configs/mimic_dataset_SigLIP_384_stage1.yaml"

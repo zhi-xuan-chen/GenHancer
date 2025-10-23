@@ -10,9 +10,9 @@ class OpenAICLIP(nn.Module):
         super().__init__()
 
         if config.clip_image_size == 224:
-            model = CLIPModel.from_pretrained('/group/40034/jasonsjma/models_hf/clip-vit-large-patch14')
+            model = CLIPModel.from_pretrained('openai/clip-vit-large-patch14')
         if config.clip_image_size == 336:
-            model = CLIPModel.from_pretrained('/group/40034/jasonsjma/models_hf/clip-vit-large-patch14-336')
+            model = CLIPModel.from_pretrained('laion/CLIP-ViT-L-14-laion2B-s32B-b82K')
 
         self.project_clip = nn.Sequential(
             nn.LayerNorm(768),
@@ -45,9 +45,9 @@ class SigLIP(nn.Module):
         super().__init__()
 
         if config.clip_image_size == 224:
-            model = SiglipModel.from_pretrained('/group/40034/jasonsjma/models_hf/siglip-so400m-patch14-224')
+            model = SiglipModel.from_pretrained('google/siglip-so400m-patch14-224')
         if config.clip_image_size == 384:
-            model = SiglipModel.from_pretrained('/group/40034/jasonsjma/models_hf/siglip-so400m-patch14-384')
+            model = SiglipModel.from_pretrained('google/siglip-so400m-patch14-384')
 
         self.project_clip = nn.Sequential(
             nn.LayerNorm(1152),
@@ -78,7 +78,7 @@ class MetaCLIP(nn.Module):
         super().__init__()
 
         if config.clip_type == 'large':
-            model = CLIPModel.from_pretrained('/group/40034/jasonsjma/models_hf/metaclip-l14-fullcc2.5b')
+            model = CLIPModel.from_pretrained('facebook/metaclip-l14-fullcc2.5b')
 
             self.project_clip = nn.Sequential(
                 nn.LayerNorm(768),
@@ -94,7 +94,7 @@ class MetaCLIP(nn.Module):
             )
 
         if config.clip_type == 'huge':
-            model = CLIPModel.from_pretrained('/group/40034/jasonsjma/models_hf/metaclip-h14-fullcc2.5b')
+            model = CLIPModel.from_pretrained('facebook/metaclip-h14-fullcc2.5b')
 
             self.project_clip = nn.Sequential(
                 nn.LayerNorm(1024),

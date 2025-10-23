@@ -40,7 +40,8 @@ from einops import rearrange
 from src.flux.sampling import denoise, get_noise, get_schedule, unpack
 from src.flux.util import configs, load_ae, load_flow_model2
 
-from image_datasets.dataset_cc3m import loader
+from image_datasets.dataset_cc3m import loader as cc3m_loader
+from image_datasets.dataset_mimic import loader as mimic_loader
 from torchvision import transforms
 
 from clip_models.build_CLIP import load_clip_model_SigLIP
@@ -124,8 +125,11 @@ def main():
             os.makedirs(args.output_dir, exist_ok=True)
 
     dit = load_flow_model2(args.model_name, device="cpu")
+    logger.info(f"Loaded DIT model successfully!")
     vae = load_ae(args.model_name, device=accelerator.device)
+    logger.info(f"Loaded VAE model successfully!")
     clip_vis = load_clip_model_SigLIP(args.clip_config, device=accelerator.device)
+    logger.info(f"Loaded CLIP model successfully!")
 
     vae.requires_grad_(False)
     dit.requires_grad_(True)
@@ -152,10 +156,20 @@ def main():
         eps=args.adam_epsilon,
     )
 
-    train_dataloader = loader(**args.data_config)
+    # 根据数据集类型选择相应的数据加载器
+    if hasattr(args.data_config, 'dataset_type') and args.data_config.dataset_type == 'custom':
+        # 为数据加载器添加batch size参数
+        data_config_with_batch = args.data_config.copy()
+        data_config_with_batch['train_batch_size'] = args.train_batch_size
+        train_dataloader = mimic_loader(**data_config_with_batch)
+    else:
+        # 默认使用CC3M数据集
+        data_config_with_batch = args.data_config.copy()
+        data_config_with_batch['train_batch_size'] = args.train_batch_size
+        train_dataloader = cc3m_loader(**data_config_with_batch)
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
-    num_update_steps_per_epoch = math.ceil(int(3e6) / args.data_config.train_batch_size) / args.gradient_accumulation_steps   # NOTE!!!
+    num_update_steps_per_epoch = math.ceil(int(3e6) / args.train_batch_size) / args.gradient_accumulation_steps   # NOTE!!!
     if args.max_train_steps is None:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
@@ -187,7 +201,33 @@ def main():
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
     if accelerator.is_main_process:
-        accelerator.init_trackers(args.tracker_project_name, {"test": None})
+        # 初始化wandb跟踪器
+        if args.report_to == "wandb":
+            # 直接初始化wandb
+            if is_wandb_available():
+                wandb.init(
+                    project=args.tracker_project_name,
+                    name=f"GenHancer_SigLIP_{args.clip_config.clip_image_size}",
+                    tags=["GenHancer", "SigLIP", "stage1", f"img_size_{args.clip_config.clip_image_size}"],
+                    config={
+                        "model_name": args.model_name,
+                        "clip_image_size": args.clip_config.clip_image_size,
+                        "learning_rate": args.learning_rate,
+                        "batch_size": args.train_batch_size,
+                        "max_train_steps": args.max_train_steps,
+                        "mixed_precision": args.mixed_precision,
+                        "dataset_type": getattr(args.data_config, 'dataset_type', 'cc3m'),
+                        "output_dir": args.output_dir,
+                        "gradient_accumulation_steps": args.gradient_accumulation_steps,
+                    }
+                )
+                logger.info(f"Initialized wandb with project: {args.tracker_project_name}")
+                logger.info(f"Experiment name: GenHancer_SigLIP_{args.clip_config.clip_image_size}")
+            else:
+                logger.warning("wandb is not available, falling back to tensorboard")
+                accelerator.init_trackers(args.tracker_project_name, {"test": None})
+        else:
+            accelerator.init_trackers(args.tracker_project_name, {"test": None})
 
     timesteps = list(torch.linspace(1, 0, 1000).numpy())
     total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
@@ -278,7 +318,25 @@ def main():
             if accelerator.sync_gradients:
                 progress_bar.update(1)
                 global_step += 1
-                accelerator.log({"train_loss": train_loss}, step=global_step)
+                # 记录训练指标
+                if args.report_to == "wandb" and accelerator.is_main_process and is_wandb_available():
+                    # 直接使用wandb记录
+                    wandb.log({
+                        "train/epoch": epoch,
+                        "train/global_step": global_step,
+                        "train/loss": train_loss,
+                        "train/learning_rate": lr_scheduler.get_last_lr()[0],
+                        "train/gradient_accumulation_steps": args.gradient_accumulation_steps,
+                        "train/mixed_precision": args.mixed_precision,
+                    }, step=global_step)
+                else:
+                    # 使用accelerator.log记录（tensorboard等）
+                    accelerator.log({
+                        "train_loss": train_loss,
+                        "learning_rate": lr_scheduler.get_last_lr()[0],
+                        "epoch": epoch,
+                        "global_step": global_step,
+                    }, step=global_step)
                 train_loss = 0.0
 
                 if global_step % args.checkpointing_steps == 0 or global_step in [50000]:
@@ -298,6 +356,14 @@ def main():
                         torch.save(optimizer.state_dict(), save_path_optimizer)
 
                         logger.info(f"Saved ckpts to {save_path_dit}, {save_path_project_clip} and {save_path_project_t5}")
+                        
+                        # 记录检查点保存
+                        if args.report_to == "wandb" and accelerator.is_main_process and is_wandb_available():
+                            wandb.log({
+                                "checkpoint/step": global_step,
+                                "checkpoint/epoch": epoch,
+                                "checkpoint/saved": True,
+                            }, step=global_step)
 
             logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
             progress_bar.set_postfix(**logs)
@@ -318,6 +384,12 @@ def main():
                 break
 
     accelerator.wait_for_everyone()
+    
+    # 结束wandb记录
+    if args.report_to == "wandb" and accelerator.is_main_process and is_wandb_available():
+        wandb.finish()
+        logger.info("Wandb logging finished")
+    
     accelerator.end_training()
 
 

@@ -1,0 +1,41 @@
+model_name: "flux-dev"
+data_config:
+  dataset_type: "custom"  # 指定使用自定义数据集
+  train_batch_size: 16
+  num_workers: 4
+  img_size: 384
+  data_path: "/path/to/your/custom/dataset.csv"  # CSV文件路径
+  data_format: "csv"  # 使用CSV格式
+  image_dir: "/path/to/your/images/"  # 图像根目录路径
+  text_column: "description"  # CSV中的文本列名
+  image_column: "file_path"  # CSV中的图像路径列名
+  seed: 0
+  patch_size: 1
+clip_config:
+  clip_image_size: 384
+  clip_dim: 768
+  t5_dim: 4096
+report_to: tensorboard
+scale_factor: 1.0   # scaled logit-normal sampling
+train_batch_size: 16
+output_dir: output_custom_csv_SigLIP_384_stage1/
+max_train_steps: 100000
+learning_rate: 1e-4
+lr_scheduler: constant
+lr_warmup_steps: 10
+adam_beta1: 0.9
+adam_beta2: 0.999
+adam_weight_decay: 0.01
+adam_epsilon: 1e-8
+momentum: 0.9
+weight_decay: 0.01
+max_grad_norm: 1.0
+logging_dir: logs
+mixed_precision: "bf16"
+checkpointing_steps: 50000
+checkpoints_total_limit: 50
+tracker_project_name: flux-lightweight
+resume_from_checkpoint: latest
+gradient_accumulation_steps: 2
+rank: 1
+
