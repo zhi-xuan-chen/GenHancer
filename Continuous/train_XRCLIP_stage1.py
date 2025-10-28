@@ -44,23 +44,33 @@ from image_datasets.dataset_cc3m import loader as cc3m_loader
 from image_datasets.dataset_mimic import loader as mimic_loader
 from torchvision import transforms
 
-from clip_models.build_CLIP import load_clip_model_SigLIP
+from clip_models.build_CLIP import load_clip_model_XRCLIP
 from clip_models.sampling import prepare_clip
-
-from peft import LoraConfig, get_peft_model
-from copy import deepcopy
 
 if is_wandb_available():
     import wandb
 logger = get_logger(__name__, log_level="INFO")
 
 
-OPENAI_DATASET_MEAN = 0.5   # NOTE!!! 0.5 for SigLIP
-OPENAI_DATASET_STD = 0.5   # NOTE!!! 0.5 for SigLIP
+OPENAI_DATASET_MEAN = 0.5   # NOTE!!! ImageNet mean for XRCLIP (single channel)
+OPENAI_DATASET_STD = 0.5    # NOTE!!! ImageNet std for XRCLIP (single channel)
 VAE_MEAN = 0.5
 VAE_STD = 0.5
 NORMALIZE_CLIP = transforms.Normalize(mean=OPENAI_DATASET_MEAN, std=OPENAI_DATASET_STD)
 NORMALIZE_VAE = transforms.Normalize(mean=VAE_MEAN, std=VAE_STD)
+
+
+class SuperModel(nn.Module):
+    def __init__(self, clip_vis, dit):
+        super().__init__()
+        self.clip_vis = clip_vis
+        self.dit = dit
+    
+    def get_clip_vis(self):
+        return self.clip_vis
+    
+    def get_dit(self):
+        return self.dit
 
 
 def parse_args():
@@ -115,47 +125,31 @@ def main():
             os.makedirs(args.output_dir, exist_ok=True)
 
     dit = load_flow_model2(args.model_name, device="cpu")
+    logger.info(f"Loaded DIT model successfully!")
     vae = load_ae(args.model_name, device=accelerator.device)
-    clip_vis = load_clip_model_SigLIP(args.clip_config, device=accelerator.device)
-    
-    # set LoRA
-    lora_config = LoraConfig(
-        r=args.lora_config.r,
-        lora_alpha=args.lora_config.lora_alpha,
-        target_modules=['k_proj', 'v_proj', 'q_proj', 'out_proj', 'fc1', 'fc2'],   # NOTE!!!
-        #target_modules='all-linear',
-        lora_dropout=args.lora_config.lora_dropout,
-        bias=args.lora_config.bias,
-    )
-    clip_vis.model = get_peft_model(clip_vis.model, lora_config)
-    clip_vis.model.print_trainable_parameters()
-
-
-    print('loading projection params...')
-    load_path_project_clip = os.path.join(args.load_dir, f"checkpoint-project-clip-{args.load_step}.bin")
-    clip_vis.project_clip.load_state_dict(torch.load(load_path_project_clip, map_location=torch.device('cpu')))
-    load_path_project_t5 = os.path.join(args.load_dir, f"checkpoint-project-t5-{args.load_step}.bin")
-    clip_vis.project_t5.load_state_dict(torch.load(load_path_project_t5, map_location=torch.device('cpu')))
-    print('loading successfully!')
-
-    print('loading dit params...')
-    load_path_dit = os.path.join(args.load_dir, f"checkpoint-dit-{args.load_step}.bin")
-    dit.load_state_dict(torch.load(load_path_dit, map_location=torch.device('cpu')))
-    print('loading successfully!')
+    logger.info(f"Loaded VAE model successfully!")
+    clip_vis = load_clip_model_XRCLIP(args.clip_config, device=accelerator.device)
+    logger.info(f"Loaded CLIP model successfully!")
 
     vae.requires_grad_(False)
-    dit.requires_grad_(False)
-    dit = dit.to(torch.bfloat16)
+    dit.requires_grad_(True)
+    dit = dit.to(torch.bfloat16)   # NOTE!!!
     dit.to(accelerator.device)
     clip_vis.train()
     dit.train()
 
     for name_, param in clip_vis.named_parameters():
         if 'project_clip' in name_ or 'project_t5' in name_:
+            param.requires_grad = True
+        else:
             param.requires_grad = False
     
+
+    # super model = clip_vis + dit
+    super_model = SuperModel(clip_vis, dit)
+
     optimizer = torch.optim.AdamW(
-        [p for p in clip_vis.parameters() if p.requires_grad],
+        [p for p in super_model.parameters() if p.requires_grad],
         lr=args.learning_rate,
         betas=(args.adam_beta1, args.adam_beta2),
         weight_decay=args.adam_weight_decay,
@@ -173,7 +167,6 @@ def main():
         data_config_with_batch = args.data_config.copy()
         data_config_with_batch['train_batch_size'] = args.train_batch_size
         train_dataloader = cc3m_loader(**data_config_with_batch)
-    
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
     
@@ -216,8 +209,8 @@ def main():
     global_step = 0
     first_epoch = 0
 
-    clip_vis, optimizer, _, lr_scheduler = accelerator.prepare(
-        clip_vis, optimizer, deepcopy(train_dataloader), lr_scheduler
+    super_model, optimizer, _, lr_scheduler = accelerator.prepare(
+        super_model, optimizer, deepcopy(train_dataloader), lr_scheduler
     )
 
     weight_dtype = torch.float32
@@ -245,8 +238,8 @@ def main():
             if is_wandb_available():
                 wandb.init(
                     project=args.tracker_project_name,
-                    name=f"GenHancer_SigLIP_{args.clip_config.clip_image_size}_stage2",
-                    tags=["GenHancer", "SigLIP", "stage2", f"img_size_{args.clip_config.clip_image_size}"],
+                    name=f"GenHancer_XRCLIP_{args.clip_config.clip_image_size}",
+                    tags=["GenHancer", "XRCLIP", "stage1", f"img_size_{args.clip_config.clip_image_size}"],
                     config={
                         "model_name": args.model_name,
                         "clip_image_size": args.clip_config.clip_image_size,
@@ -257,11 +250,10 @@ def main():
                         "dataset_type": getattr(args.data_config, 'dataset_type', 'cc3m'),
                         "output_dir": args.output_dir,
                         "gradient_accumulation_steps": args.gradient_accumulation_steps,
-                        "lora_config": args.lora_config,
                     }
                 )
                 logger.info(f"Initialized wandb with project: {args.tracker_project_name}")
-                logger.info(f"Experiment name: GenHancer_SigLIP_{args.clip_config.clip_image_size}_stage2")
+                logger.info(f"Experiment name: GenHancer_XRCLIP_{args.clip_config.clip_image_size}")
             else:
                 logger.warning("wandb is not available, falling back to tensorboard")
                 accelerator.init_trackers(args.tracker_project_name, {"test": None})
@@ -313,14 +305,16 @@ def main():
     for epoch in range(first_epoch, int(args.num_train_epochs)):
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
-            with accelerator.accumulate(clip_vis):
+            # accumulate super_model
+            with accelerator.accumulate(super_model):
                 original_img, prompts = batch['image'], batch['text']
                 original_img = original_img.to(accelerator.device)
                 
                 with torch.no_grad():
                     x_1 = vae.encode(NORMALIZE_VAE(original_img).to(torch.float32))
 
-                inp = prepare_clip(clip=clip_vis, original_img=NORMALIZE_CLIP(original_img).to(weight_dtype), img=x_1.to(weight_dtype))
+                # NOTE: remove normalization for XRCLIP
+                inp = prepare_clip(clip=super_model.clip_vis, original_img=original_img.to(weight_dtype), img=x_1.to(weight_dtype))
                 x_1 = rearrange(x_1, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
                 bs = original_img.shape[0]
                 t = torch.sigmoid(torch.randn((bs,), device=accelerator.device) * args.scale_factor)
@@ -330,13 +324,13 @@ def main():
                 guidance_vec = torch.full((x_t.shape[0],), 4, device=x_t.device, dtype=x_t.dtype)
 
                 # Predict the noise residual and compute loss
-                model_pred = dit(img=x_t.to(weight_dtype),
-                                 img_ids=inp['img_ids'].to(weight_dtype),
-                                 txt=inp['txt'].to(weight_dtype),
-                                 txt_ids=inp['txt_ids'].to(weight_dtype),
-                                 y=inp['vec'].to(weight_dtype),
-                                 timesteps=t.to(weight_dtype),
-                                 guidance=guidance_vec.to(weight_dtype),)
+                model_pred = super_model.dit(img=x_t.to(weight_dtype),
+                                             img_ids=inp['img_ids'].to(weight_dtype),
+                                             txt=inp['txt'].to(weight_dtype),
+                                             txt_ids=inp['txt_ids'].to(weight_dtype),
+                                             y=inp['vec'].to(weight_dtype),
+                                             timesteps=t.to(weight_dtype),
+                                             guidance=guidance_vec.to(weight_dtype),)
 
                 loss = F.mse_loss(model_pred.float(), (x_0 - x_1).float(), reduction="mean")
 
@@ -347,7 +341,7 @@ def main():
                 # Backpropagate
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
-                    accelerator.clip_grad_norm_(clip_vis.parameters(), args.max_grad_norm)   # NOTE!!!
+                    accelerator.clip_grad_norm_(super_model.parameters(), args.max_grad_norm)   # NOTE!!!
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
@@ -377,23 +371,48 @@ def main():
                     }, step=global_step)
                 train_loss = 0.0
 
-                if global_step % args.checkpointing_steps == 0 or global_step in [50, 100, 200, 300, 500, 1000, 2000, 3000]:
+                if global_step % args.checkpointing_steps == 0 or global_step in [50000]:
                     if accelerator.is_main_process:
-                        save_path = os.path.join(args.output_dir, f"siglip-so400m-patch14-{args.clip_config.clip_image_size}-{global_step}")
-                        unwrapped_clip_vis = accelerator.unwrap_model(clip_vis)
-                        save_model = deepcopy(unwrapped_clip_vis.model).merge_and_unload()
-                        save_model.save_pretrained(save_path, safe_serialization=False)
-                        logger.info(f"Saved ckpts to {save_path}")
+                        unwrapped_super_model = accelerator.unwrap_model(super_model)
+                        # save dit ckpts
+                        save_path_dit = os.path.join(args.output_dir, f"checkpoint-dit-{global_step}.bin")
+                        torch.save(deepcopy(unwrapped_super_model.dit).state_dict(), save_path_dit)
+                        # save project clip ckpts
+                        save_path_project_clip = os.path.join(args.output_dir, f"checkpoint-project-clip-{global_step}.bin")
+                        torch.save(deepcopy(unwrapped_super_model.clip_vis.project_clip).state_dict(), save_path_project_clip)
+                        # save project t5 ckpts
+                        save_path_project_t5 = os.path.join(args.output_dir, f"checkpoint-project-t5-{global_step}.bin")
+                        torch.save(deepcopy(unwrapped_super_model.clip_vis.project_t5).state_dict(), save_path_project_t5)
+                        # save optimizer state
+                        save_path_optimizer = os.path.join(args.output_dir, f"optimizer-state-{global_step}.bin")
+                        torch.save(optimizer.state_dict(), save_path_optimizer)
+
+                        logger.info(f"Saved ckpts to {save_path_dit}, {save_path_project_clip} and {save_path_project_t5}")
+                        
+                        # 记录检查点保存
+                        if args.report_to == "wandb" and accelerator.is_main_process and is_wandb_available():
+                            wandb.log({
+                                "checkpoint/step": global_step,
+                                "checkpoint/epoch": epoch,
+                                "checkpoint/saved": True,
+                            }, step=global_step)
 
             logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
             progress_bar.set_postfix(**logs)
 
             if global_step >= int(args.max_train_steps):
                 if accelerator.is_main_process:
-                    save_path = os.path.join(args.output_dir, f"siglip-so400m-patch14-{args.clip_config.clip_image_size}-{global_step}")
-                    unwrapped_clip_vis = accelerator.unwrap_model(clip_vis)
-                    save_model = deepcopy(unwrapped_clip_vis.model).merge_and_unload()
-                    save_model.save_pretrained(save_path, safe_serialization=False)
+                    unwrapped_super_model = accelerator.unwrap_model(super_model)
+                    # save dit ckpts
+                    save_path_dit = os.path.join(args.output_dir, f"checkpoint-dit-{global_step}.bin")
+                    torch.save(deepcopy(unwrapped_super_model.dit).state_dict(), save_path_dit)
+                    # save project clip ckpts
+                    save_path_project_clip = os.path.join(args.output_dir, f"checkpoint-project-clip-{global_step}.bin")
+                    torch.save(deepcopy(unwrapped_super_model.clip_vis.project_clip).state_dict(), save_path_project_clip)
+                    # save project t5 ckpts
+                    save_path_project_t5 = os.path.join(args.output_dir, f"checkpoint-project-t5-{global_step}.bin")
+                    torch.save(deepcopy(unwrapped_super_model.clip_vis.project_t5).state_dict(), save_path_project_t5) 
+
                 break
 
     accelerator.wait_for_everyone()

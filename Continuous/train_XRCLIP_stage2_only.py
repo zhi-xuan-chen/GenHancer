@@ -44,7 +44,7 @@ from image_datasets.dataset_cc3m import loader as cc3m_loader
 from image_datasets.dataset_mimic import loader as mimic_loader
 from torchvision import transforms
 
-from clip_models.build_CLIP import load_clip_model_SigLIP
+from clip_models.build_CLIP import load_clip_model_XRCLIP
 from clip_models.sampling import prepare_clip
 
 from peft import LoraConfig, get_peft_model
@@ -55,8 +55,8 @@ if is_wandb_available():
 logger = get_logger(__name__, log_level="INFO")
 
 
-OPENAI_DATASET_MEAN = 0.5   # NOTE!!! 0.5 for SigLIP
-OPENAI_DATASET_STD = 0.5   # NOTE!!! 0.5 for SigLIP
+OPENAI_DATASET_MEAN = 0.5   # NOTE!!! ImageNet mean for XRCLIP (single channel)
+OPENAI_DATASET_STD = 0.5    # NOTE!!! ImageNet std for XRCLIP (single channel)
 VAE_MEAN = 0.5
 VAE_STD = 0.5
 NORMALIZE_CLIP = transforms.Normalize(mean=OPENAI_DATASET_MEAN, std=OPENAI_DATASET_STD)
@@ -116,13 +116,13 @@ def main():
 
     dit = load_flow_model2(args.model_name, device="cpu")
     vae = load_ae(args.model_name, device=accelerator.device)
-    clip_vis = load_clip_model_SigLIP(args.clip_config, device=accelerator.device)
+    clip_vis = load_clip_model_XRCLIP(args.clip_config, device=accelerator.device)
     
     # set LoRA
     lora_config = LoraConfig(
         r=args.lora_config.r,
         lora_alpha=args.lora_config.lora_alpha,
-        target_modules=['k_proj', 'v_proj', 'q_proj', 'out_proj', 'fc1', 'fc2'],   # NOTE!!!
+        target_modules=['attn.qkv', 'attn.proj', 'mlp.fc1', 'mlp.fc2'],   # NOTE!!! For timm ViT
         #target_modules='all-linear',
         lora_dropout=args.lora_config.lora_dropout,
         bias=args.lora_config.bias,
@@ -245,8 +245,8 @@ def main():
             if is_wandb_available():
                 wandb.init(
                     project=args.tracker_project_name,
-                    name=f"GenHancer_SigLIP_{args.clip_config.clip_image_size}_stage2",
-                    tags=["GenHancer", "SigLIP", "stage2", f"img_size_{args.clip_config.clip_image_size}"],
+                    name=f"GenHancer_XRCLIP_{args.clip_config.clip_image_size}_stage2",
+                    tags=["GenHancer", "XRCLIP", "stage2", f"img_size_{args.clip_config.clip_image_size}"],
                     config={
                         "model_name": args.model_name,
                         "clip_image_size": args.clip_config.clip_image_size,
@@ -261,7 +261,7 @@ def main():
                     }
                 )
                 logger.info(f"Initialized wandb with project: {args.tracker_project_name}")
-                logger.info(f"Experiment name: GenHancer_SigLIP_{args.clip_config.clip_image_size}_stage2")
+                logger.info(f"Experiment name: GenHancer_XRCLIP_{args.clip_config.clip_image_size}_stage2")
             else:
                 logger.warning("wandb is not available, falling back to tensorboard")
                 accelerator.init_trackers(args.tracker_project_name, {"test": None})
@@ -319,8 +319,9 @@ def main():
                 
                 with torch.no_grad():
                     x_1 = vae.encode(NORMALIZE_VAE(original_img).to(torch.float32))
-
-                inp = prepare_clip(clip=clip_vis, original_img=NORMALIZE_CLIP(original_img).to(weight_dtype), img=x_1.to(weight_dtype))
+                
+                # NOTE: remove normalization for XRCLIP
+                inp = prepare_clip(clip=clip_vis, original_img=original_img, img=x_1)
                 x_1 = rearrange(x_1, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
                 bs = original_img.shape[0]
                 t = torch.sigmoid(torch.randn((bs,), device=accelerator.device) * args.scale_factor)
@@ -379,7 +380,7 @@ def main():
 
                 if global_step % args.checkpointing_steps == 0 or global_step in [50, 100, 200, 300, 500, 1000, 2000, 3000]:
                     if accelerator.is_main_process:
-                        save_path = os.path.join(args.output_dir, f"siglip-so400m-patch14-{args.clip_config.clip_image_size}-{global_step}")
+                        save_path = os.path.join(args.output_dir, f"xrclip-{args.clip_config.clip_image_size}-{global_step}")
                         unwrapped_clip_vis = accelerator.unwrap_model(clip_vis)
                         save_model = deepcopy(unwrapped_clip_vis.model).merge_and_unload()
                         save_model.save_pretrained(save_path, safe_serialization=False)
@@ -390,7 +391,7 @@ def main():
 
             if global_step >= int(args.max_train_steps):
                 if accelerator.is_main_process:
-                    save_path = os.path.join(args.output_dir, f"siglip-so400m-patch14-{args.clip_config.clip_image_size}-{global_step}")
+                    save_path = os.path.join(args.output_dir, f"xrclip-{args.clip_config.clip_image_size}-{global_step}")
                     unwrapped_clip_vis = accelerator.unwrap_model(clip_vis)
                     save_model = deepcopy(unwrapped_clip_vis.model).merge_and_unload()
                     save_model.save_pretrained(save_path, safe_serialization=False)

@@ -169,10 +169,36 @@ def main():
         train_dataloader = cc3m_loader(**data_config_with_batch)
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
-    num_update_steps_per_epoch = math.ceil(int(3e6) / args.train_batch_size) / args.gradient_accumulation_steps   # NOTE!!!
-    if args.max_train_steps is None:
+    
+    # 获取实际数据集大小
+    if hasattr(args.data_config, 'dataset_type') and args.data_config.dataset_type == 'custom':
+        # 对于自定义数据集，我们需要从数据加载器获取实际大小
+        # 先创建一个临时的数据加载器来获取数据集大小
+        temp_data_config = args.data_config.copy()
+        temp_data_config['train_batch_size'] = args.train_batch_size
+        temp_dataloader = mimic_loader(**temp_data_config)
+        dataset_size = len(temp_dataloader.dataset)
+        logger.info(f"Dataset size: {dataset_size}")
+    else:
+        # 默认使用CC3M数据集大小
+        dataset_size = int(3e6)
+        logger.info(f"Using default CC3M dataset size: {dataset_size}")
+    
+    num_update_steps_per_epoch = math.ceil(dataset_size / args.train_batch_size) / args.gradient_accumulation_steps
+    logger.info(f"Number of update steps per epoch: {num_update_steps_per_epoch}")
+    
+    # 优先使用epoch数，如果设置了epoch数，则计算对应的步数
+    if hasattr(args, 'num_train_epochs') and args.num_train_epochs is not None:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
+        logger.info(f"Using epoch-based training: {args.num_train_epochs} epochs = {args.max_train_steps} steps")
+    elif args.max_train_steps is None:
+        # 如果没有设置epoch数也没有设置步数，使用默认epoch数
+        if not hasattr(args, 'num_train_epochs') or args.num_train_epochs is None:
+            args.num_train_epochs = 10  # 默认10个epoch
+        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+        overrode_max_train_steps = True
+        logger.info(f"Using default epoch-based training: {args.num_train_epochs} epochs = {args.max_train_steps} steps")
 
     lr_scheduler = get_scheduler(
         args.lr_scheduler,
@@ -197,8 +223,13 @@ def main():
 
 
     if overrode_max_train_steps:
-        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
-    args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
+        # 基于epoch数计算步数，无需额外处理
+        pass
+    else:
+        # 当用户明确设置了max_train_steps时，计算需要的epoch数
+        args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
+        logger.info(f"Calculated number of epochs needed: {args.num_train_epochs}")
+        logger.info(f"Total training steps will be: {args.max_train_steps}")
 
     if accelerator.is_main_process:
         # 初始化wandb跟踪器
@@ -265,13 +296,13 @@ def main():
     else:
         initial_global_step = 0
     progress_bar = tqdm(
-        range(0, args.max_train_steps),
+        range(0, int(args.max_train_steps)),
         initial=initial_global_step,
         desc="Steps",
         disable=not accelerator.is_local_main_process,
     )
 
-    for epoch in range(first_epoch, args.num_train_epochs):
+    for epoch in range(first_epoch, int(args.num_train_epochs)):
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
             # accumulate super_model
@@ -368,7 +399,7 @@ def main():
             logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
             progress_bar.set_postfix(**logs)
 
-            if global_step >= args.max_train_steps:
+            if global_step >= int(args.max_train_steps):
                 if accelerator.is_main_process:
                     unwrapped_super_model = accelerator.unwrap_model(super_model)
                     # save dit ckpts

@@ -16,18 +16,12 @@ from src.flux.sampling import denoise_controlnet, get_noise, get_schedule, prepa
 from src.flux.model import Flux
 from src.flux.util import (
     load_ae,
-    load_clip,
-    load_flow_model,
-    load_t5,
-    get_lora_rank,
-    load_checkpoint
+    load_flow_model2
 )
 
 from image_datasets.dataset_cc3m import image_transform
-from src.flux.util import (configs, load_ae, load_clip,
-                       load_flow_model2, load_t5)
 
-from clip_models.build_CLIP import load_clip_model_OpenAICLIP
+from clip_models.build_CLIP import load_clip_model_SigLIP
 from clip_models.sampling import prepare_clip
 from torchvision import transforms
 
@@ -153,7 +147,7 @@ class XFluxPipeline:
                 self.clip_vis = self.clip_vis.to(self.device)
 
             #inp_cond = prepare(t5=self.t5, clip=self.clip, img=x, prompt=prompt)
-            inp_cond = prepare_clip(clip=self.clip_vis, seq_t5=self.seq_t5, original_img=NORMALIZE_CLIP(original_img).to(torch.bfloat16), img=x)
+            inp_cond = prepare_clip(clip=self.clip_vis, original_img=NORMALIZE_CLIP(original_img).to(torch.bfloat16), img=x)
 
             if self.offload:
                 self.model = self.model.to(self.device)
@@ -218,9 +212,16 @@ if __name__ == "__main__":
     model_name = "flux-dev"
 
     idx = 2
-    load_dir = "output_mlp2_global_sigmoid_stage1_s1.0"
-    load_step = 70000
-    image_path = f'generated_images/test{idx}.jpg'
+    load_dir = "/jhcnas5/chenzhixuan/checkpoints/GenHancer/outputs/mimic_SigLIP_384_stage1"
+    load_step = 10000
+    image_path = f'generated_images/test{idx}.png'
+    # 如果文件不存在，创建一个测试图像
+    if not os.path.exists(image_path):
+        print(f"Creating test image: {image_path}")
+        os.makedirs('generated_images', exist_ok=True)
+        # 创建一个简单的测试图像
+        test_img = Image.new('RGB', (224, 224), color='white')
+        test_img.save(image_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     img_size = 224
@@ -240,7 +241,7 @@ if __name__ == "__main__":
 
     dit = load_flow_model2(model_name, device="cpu")
     vae = load_ae(model_name, device=device)
-    clip_vis = load_clip_model_OpenAICLIP(args, device=device)
+    clip_vis = load_clip_model_SigLIP(args, device=device)
 
     print('loading projection params...')
     load_path_project_clip = os.path.join(load_dir, f"checkpoint-project-clip-{load_step}.bin")

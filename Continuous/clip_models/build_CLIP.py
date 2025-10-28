@@ -1,5 +1,13 @@
 import torch
-from .CLIP_bank import OpenAICLIP, SigLIP, MetaCLIP 
+from .CLIP_bank import OpenAICLIP, SigLIP, MetaCLIP, XRCLIP
+
+
+def load_clip_model_XRCLIP(config, device):
+    class_model = XRCLIP(config)
+    class_model.to(device)
+    class_model.to(torch.float32)
+
+    return class_model
 
 
 def load_clip_model_OpenAICLIP(config, device):
