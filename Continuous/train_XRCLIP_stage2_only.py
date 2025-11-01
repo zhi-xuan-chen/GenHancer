@@ -191,19 +191,25 @@ def main():
         dataset_size = int(3e6)
         logger.info(f"Using default CC3M dataset size: {dataset_size}")
     
-    num_update_steps_per_epoch = math.ceil(dataset_size / args.train_batch_size) / args.gradient_accumulation_steps
+    # 正确计算每个epoch的步数：需要考虑drop_last的影响
+    # 如果drop_last=True，实际批次数 = floor(dataset_size / batch_size)
+    # 如果drop_last=False，实际批次数 = ceil(dataset_size / batch_size)
+    # 这里使用math.floor来匹配drop_last=True的情况
+    num_batches_per_epoch = math.floor(dataset_size / args.train_batch_size)
+    num_update_steps_per_epoch = num_batches_per_epoch / args.gradient_accumulation_steps
+    logger.info(f"Number of batches per epoch (considering drop_last): {num_batches_per_epoch}")
     logger.info(f"Number of update steps per epoch: {num_update_steps_per_epoch}")
     
     # 优先使用epoch数，如果设置了epoch数，则计算对应的步数
     if hasattr(args, 'num_train_epochs') and args.num_train_epochs is not None:
-        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+        args.max_train_steps = int(args.num_train_epochs * num_update_steps_per_epoch)
         overrode_max_train_steps = True
         logger.info(f"Using epoch-based training: {args.num_train_epochs} epochs = {args.max_train_steps} steps")
     elif args.max_train_steps is None:
         # 如果没有设置epoch数也没有设置步数，使用默认epoch数
         if not hasattr(args, 'num_train_epochs') or args.num_train_epochs is None:
             args.num_train_epochs = 10  # 默认10个epoch
-        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+        args.max_train_steps = int(args.num_train_epochs * num_update_steps_per_epoch)
         overrode_max_train_steps = True
         logger.info(f"Using default epoch-based training: {args.num_train_epochs} epochs = {args.max_train_steps} steps")
 
@@ -321,7 +327,7 @@ def main():
                     x_1 = vae.encode(NORMALIZE_VAE(original_img).to(torch.float32))
                 
                 # NOTE: remove normalization for XRCLIP
-                inp = prepare_clip(clip=clip_vis, original_img=original_img, img=x_1)
+                inp = prepare_clip(clip=clip_vis, original_img=original_img.to(weight_dtype), img=x_1.to(weight_dtype))
                 x_1 = rearrange(x_1, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
                 bs = original_img.shape[0]
                 t = torch.sigmoid(torch.randn((bs,), device=accelerator.device) * args.scale_factor)
@@ -383,7 +389,12 @@ def main():
                         save_path = os.path.join(args.output_dir, f"xrclip-{args.clip_config.clip_image_size}-{global_step}")
                         unwrapped_clip_vis = accelerator.unwrap_model(clip_vis)
                         save_model = deepcopy(unwrapped_clip_vis.model).merge_and_unload()
-                        save_model.save_pretrained(save_path, safe_serialization=False)
+                        os.makedirs(save_path, exist_ok=True)
+                        state_dict_cpu = {k: v.detach().cpu() for k, v in save_model.state_dict().items()}
+                        # 优先保存为 safetensors
+                        save_file(state_dict_cpu, os.path.join(save_path, "model.safetensors"))
+                        # 同时保存一个 PyTorch 版本，便于通用加载
+                        torch.save(state_dict_cpu, os.path.join(save_path, "pytorch_model.bin"))
                         logger.info(f"Saved ckpts to {save_path}")
 
             logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
@@ -394,7 +405,10 @@ def main():
                     save_path = os.path.join(args.output_dir, f"xrclip-{args.clip_config.clip_image_size}-{global_step}")
                     unwrapped_clip_vis = accelerator.unwrap_model(clip_vis)
                     save_model = deepcopy(unwrapped_clip_vis.model).merge_and_unload()
-                    save_model.save_pretrained(save_path, safe_serialization=False)
+                    os.makedirs(save_path, exist_ok=True)
+                    state_dict_cpu = {k: v.detach().cpu() for k, v in save_model.state_dict().items()}
+                    save_file(state_dict_cpu, os.path.join(save_path, "model.safetensors"))
+                    torch.save(state_dict_cpu, os.path.join(save_path, "pytorch_model.bin"))
                 break
 
     accelerator.wait_for_everyone()

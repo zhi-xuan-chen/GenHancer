@@ -140,7 +140,7 @@ def main():
 
     print('loading dit params...')
     load_path_dit = os.path.join(args.load_dir, f"checkpoint-dit-{args.load_step}.bin")
-    dit.load_state_dict(torch.load(load_path_dit, map_location=torch.device('cpu')))
+    dit.load_state_dict(torch.load(load_path_dit))
     print('loading successfully!')
 
     vae.requires_grad_(False)

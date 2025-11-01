@@ -11,7 +11,7 @@ class XRCLIP(nn.Module):
         super().__init__()
         self.model = vit_base_patch16_224(in_chans=1)
         self.model.head = nn.Identity()
-        self.model.load_state_dict(torch.load('/jhcnas5/chenzhixuan/checkpoints/VIRAL/XR_clip.ckpt'), strict=True)
+        self.model.load_state_dict(torch.load('/jhcnas5/chenzhixuan/checkpoints/GenHancer/XR_clip.ckpt'), strict=True)
         self.model.to(torch.float32)
         self.config = config
         self.project_clip = nn.Sequential(

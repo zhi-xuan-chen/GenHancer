@@ -22,9 +22,9 @@ lora_config:
   bias: "lora_only"
 report_to: wandb
 scale_factor: 1.0   # scaled logit-normal sampling
-train_batch_size: 10
+train_batch_size: 16
 load_dir: /jhcnas5/chenzhixuan/checkpoints/GenHancer/outputs/mimic_XRCLIP_224_stage1/
-load_step: 10000
+load_step: 26000
 output_dir: /jhcnas5/chenzhixuan/checkpoints/GenHancer/outputs/mimic_XRCLIP_224_stage2/
 # 训练配置 - 可以选择使用epoch数或步数
 num_train_epochs: 5  # 直接设置训练轮数，更直观
