@@ -1,4 +1,5 @@
 import argparse
+import ast
 import logging
 import math
 import os
@@ -40,8 +41,10 @@ from einops import rearrange
 from src.flux.sampling import denoise, get_noise, get_schedule, unpack
 from src.flux.util import configs, load_ae, load_flow_model2
 
-from image_datasets.dataset_cc3m import loader as cc3m_loader
 from image_datasets.dataset_mimic import loader as mimic_loader
+from image_datasets.dataset_chexpert import loader as chexpert_loader
+from image_datasets.dataset_padchest import loader as padchest_loader
+from image_datasets.dataset_combined import loader as combined_loader
 from torchvision import transforms
 
 from clip_models.build_CLIP import load_clip_model_XRCLIP
@@ -161,31 +164,45 @@ def main():
         # 为数据加载器添加batch size参数
         data_config_with_batch = args.data_config.copy()
         data_config_with_batch['train_batch_size'] = args.train_batch_size
-        train_dataloader = mimic_loader(**data_config_with_batch)
+        # 检查 dataset_name 是否是列表
+        dataset_name = args.data_config.dataset_name
+        
+        # 先检查是否已经是列表类型（包括 OmegaConf ListConfig）
+        if not isinstance(dataset_name, list):
+            # 如果不是列表，检查是否是字符串且以 [] 包裹
+            if isinstance(dataset_name, str) and dataset_name.strip().startswith('[') and dataset_name.strip().endswith(']'):
+                dataset_name = ast.literal_eval(dataset_name)
+            # 如果是可迭代对象（如 OmegaConf ListConfig）但不是列表，转换为列表
+            elif hasattr(dataset_name, '__iter__') and not isinstance(dataset_name, str):
+                dataset_name = list(dataset_name)
+        
+        if isinstance(dataset_name, list):
+            # 如果是列表，使用 combined loader
+            train_dataloader = combined_loader(**data_config_with_batch)
+        elif dataset_name == 'mimic':
+            train_dataloader = mimic_loader(**data_config_with_batch)
+        elif dataset_name == 'chexpert':
+            train_dataloader = chexpert_loader(**data_config_with_batch)
+        elif dataset_name == 'padchest':
+            train_dataloader = padchest_loader(**data_config_with_batch)
+        else:
+            raise ValueError(f"Unsupported dataset name: {dataset_name}")
     else:
-        # 默认使用CC3M数据集
-        data_config_with_batch = args.data_config.copy()
-        data_config_with_batch['train_batch_size'] = args.train_batch_size
-        train_dataloader = cc3m_loader(**data_config_with_batch)
+        raise ValueError("dataset_type must be 'custom' when using stage1 script.")
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
     
-    # 获取实际数据集大小
+    # 获取实际数据集大小（直接使用已创建的 train_dataloader）
     if hasattr(args.data_config, 'dataset_type') and args.data_config.dataset_type == 'custom':
-        # 对于自定义数据集，我们需要从数据加载器获取实际大小
-        # 先创建一个临时的数据加载器来获取数据集大小
-        temp_data_config = args.data_config.copy()
-        temp_data_config['train_batch_size'] = args.train_batch_size
-        temp_dataloader = mimic_loader(**temp_data_config)
-        dataset_size = len(temp_dataloader.dataset)
+        dataset_size = len(train_dataloader.dataset)
         logger.info(f"Dataset size: {dataset_size}")
     else:
-        # 默认使用CC3M数据集大小
-        dataset_size = int(3e6)
-        logger.info(f"Using default CC3M dataset size: {dataset_size}")
+        raise ValueError("dataset_type must be 'custom' when using stage1 script.")
     
-    num_update_steps_per_epoch = math.ceil(dataset_size / args.train_batch_size) / args.gradient_accumulation_steps
-    logger.info(f"Number of update steps per epoch: {num_update_steps_per_epoch}")
+    # 计算每个epoch的更新步数时，需要考虑多卡的总batch size
+    total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
+    num_update_steps_per_epoch = math.ceil(dataset_size / total_batch_size)
+    logger.info(f"Number of update steps per epoch: {num_update_steps_per_epoch} (total_batch_size={total_batch_size}, num_processes={accelerator.num_processes})")
     
     # 优先使用epoch数，如果设置了epoch数，则计算对应的步数
     if hasattr(args, 'num_train_epochs') and args.num_train_epochs is not None:
@@ -193,7 +210,7 @@ def main():
         overrode_max_train_steps = True
         logger.info(f"Using epoch-based training: {args.num_train_epochs} epochs = {args.max_train_steps} steps")
     elif args.max_train_steps is None:
-        # 如果没有设置epoch数也没有设置步数，使用默认epoch数
+        # 如果没有设置epoch数，使用默认epoch数
         if not hasattr(args, 'num_train_epochs') or args.num_train_epochs is None:
             args.num_train_epochs = 10  # 默认10个epoch
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
@@ -203,14 +220,14 @@ def main():
     lr_scheduler = get_scheduler(
         args.lr_scheduler,
         optimizer=optimizer,
-        num_warmup_steps=args.lr_warmup_steps * accelerator.num_processes,
-        num_training_steps=args.max_train_steps * accelerator.num_processes,
+        num_warmup_steps=int(args.lr_warmup_steps),
+        num_training_steps=int(args.max_train_steps),
     )
     global_step = 0
     first_epoch = 0
 
-    super_model, optimizer, _, lr_scheduler = accelerator.prepare(
-        super_model, optimizer, deepcopy(train_dataloader), lr_scheduler
+    super_model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
+        super_model, optimizer, train_dataloader, lr_scheduler
     )
 
     weight_dtype = torch.float32
@@ -244,10 +261,11 @@ def main():
                         "model_name": args.model_name,
                         "clip_image_size": args.clip_config.clip_image_size,
                         "learning_rate": args.learning_rate,
+                        "total_batch_size": total_batch_size,
                         "batch_size": args.train_batch_size,
                         "max_train_steps": args.max_train_steps,
                         "mixed_precision": args.mixed_precision,
-                        "dataset_type": getattr(args.data_config, 'dataset_type', 'cc3m'),
+                        "dataset_type": getattr(args.data_config, 'dataset_type', 'custom'),
                         "output_dir": args.output_dir,
                         "gradient_accumulation_steps": args.gradient_accumulation_steps,
                     }
@@ -261,7 +279,6 @@ def main():
             accelerator.init_trackers(args.tracker_project_name, {"test": None})
 
     timesteps = list(torch.linspace(1, 0, 1000).numpy())
-    total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
 
     logger.info("***** Running training *****")
     logger.info(f"  Num Epochs = {args.num_train_epochs}")
@@ -301,8 +318,13 @@ def main():
         desc="Steps",
         disable=not accelerator.is_local_main_process,
     )
-
+    
+    # 兜底停止标志，防止边界情况下多跑
+    should_stop = False
     for epoch in range(first_epoch, int(args.num_train_epochs)):
+        # 分布式采样器在每个 epoch 设定不同的分片与打乱
+        if hasattr(train_dataloader, "sampler") and hasattr(train_dataloader.sampler, "set_epoch"):
+            train_dataloader.sampler.set_epoch(epoch)
         train_loss = 0.0
         for step, batch in enumerate(train_dataloader):
             # accumulate super_model
@@ -342,9 +364,9 @@ def main():
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
                     accelerator.clip_grad_norm_(super_model.parameters(), args.max_grad_norm)   # NOTE!!!
-                optimizer.step()
-                lr_scheduler.step()
-                optimizer.zero_grad()
+                    optimizer.step()
+                    lr_scheduler.step()
+                    optimizer.zero_grad()
 
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
@@ -371,7 +393,7 @@ def main():
                     }, step=global_step)
                 train_loss = 0.0
 
-                if global_step % args.checkpointing_steps == 0 or global_step in [50000]:
+                if global_step % args.checkpointing_steps == 0:
                     if accelerator.is_main_process:
                         unwrapped_super_model = accelerator.unwrap_model(super_model)
                         # save dit ckpts
@@ -413,7 +435,11 @@ def main():
                     save_path_project_t5 = os.path.join(args.output_dir, f"checkpoint-project-t5-{global_step}.bin")
                     torch.save(deepcopy(unwrapped_super_model.clip_vis.project_t5).state_dict(), save_path_project_t5) 
 
+                should_stop = True
                 break
+
+        if should_stop:
+            break
 
     accelerator.wait_for_everyone()
     

@@ -133,9 +133,9 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="Test VAE autoencoder reconstruction")
-    parser.add_argument("--image", type=str, default="/home/chenzhixuan/Workspace/GenHancer/Continuous/generated_images/test2.png", help="Path to input image")
+    parser.add_argument("--image", type=str, default="/home/chenzhixuan/Workspace/GenHancer/Continuous/utils/image copy.png", help="Path to input image")
     parser.add_argument("--model", type=str, default="flux-dev", help="Model name")
-    parser.add_argument("--device", type=str, default="cuda:2", help="Device to use")
+    parser.add_argument("--device", type=str, default="cuda:1", help="Device to use")
     
     args = parser.parse_args()
     

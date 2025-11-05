@@ -66,12 +66,12 @@ def image_transform(
         ])
 
 
-class MimicDataset(Dataset):
-    """MIMIC-CXR数据集类，支持多种数据格式"""
+class PadChestDataset(Dataset):
+    """PadChest数据集类，支持多种数据格式"""
     
-    def __init__(self, data_path: str, data_format: str = "json", 
+    def __init__(self, data_path: str, data_format: str = "csv", 
                  image_size: int = 224, is_train: bool = True, 
-                 text_column: str = "caption", image_column: str = "image_path",
+                 text_column: str = "Translated_Report", image_column: str = "ImageID",
                  image_dir: str = None, split: str = "train"):
         """
         Args:
@@ -91,6 +91,7 @@ class MimicDataset(Dataset):
         self.image_dir = image_dir
         self.transform = image_transform(image_size, is_train)
         self.split = split
+        
         # 加载数据
         self.data_pairs = self._load_data()
         print(f"Loaded {len(self.data_pairs)} image-text pairs from {data_path}")
@@ -149,6 +150,7 @@ class MimicDataset(Dataset):
                 dfs.append(pd.read_csv(csv_file))
             df = pd.concat(dfs, ignore_index=True)
             df = df[df['split'] == self.split]
+        
         for _, row in df.iterrows():
             if self.image_column in row and self.text_column in row:
                 image_path = row[self.image_column]
@@ -210,8 +212,8 @@ class MimicDataset(Dataset):
         return len(self.data_pairs)
     
     def __getitem__(self, idx):
-        image_path = self.data_pairs[idx][self.image_column][0]
-        text = self.data_pairs[idx][self.text_column]
+        image_path = self.data_pairs[idx][0]
+        text = self.data_pairs[idx][1]
         
         image_path = self._get_absolute_image_path(image_path)
         
@@ -231,7 +233,7 @@ class MimicDataset(Dataset):
 
 
 @dataclass
-class MimicDatasetCollator:
+class PadChestDatasetCollator:
     """MIMIC-CXR数据集的数据整理器"""
     
     def __call__(self, samples: Sequence[Dict]) -> Dict[str, torch.Tensor]:
@@ -252,42 +254,44 @@ class MimicDatasetCollator:
         return batch
 
 
-def get_mimic_dataset_and_collator(data_path: str, data_format: str = "json",
+def get_padchest_dataset_and_collator(data_path: str, data_format: str = "csv",
                                   img_size: int = 224, is_train: bool = True,
-                                  text_column: str = "caption", 
-                                  image_column: str = "image_path",
-                                  image_dir: str = None):
+                                  text_column: str = "Translated_Report", 
+                                  image_column: str = "ImageID",
+                                  image_dir: str = None, split: str = "train"):
     """获取MIMIC-CXR数据集和数据整理器"""
     
-    dataset = MimicDataset(
+    dataset = PadChestDataset(
         data_path=data_path,
         data_format=data_format,
         image_size=img_size,
         is_train=is_train,
         text_column=text_column,
         image_column=image_column,
-        image_dir=image_dir
+        image_dir=image_dir,
+        split=split
     )
     
-    collator = MimicDatasetCollator()
+    collator = PadChestDatasetCollator()
     
     return dataset, collator
 
 
 def loader(train_batch_size: int, num_workers: int, data_path: str, 
-          data_format: str = "json", img_size: int = 224, 
-          text_column: str = "caption", image_column: str = "image_path", 
-          image_dir: str = None, **args):
+          data_format: str = "csv", img_size: int = 224, 
+          text_column: str = "Translated_Report", image_column: str = "ImageID", 
+          image_dir: str = None, split: str = "train", **args):
     """数据加载器函数，与原始loader接口兼容"""
     
-    dataset, collator = get_mimic_dataset_and_collator(
+    dataset, collator = get_padchest_dataset_and_collator(
         data_path=data_path,
         data_format=data_format,
         img_size=img_size,
         is_train=True,
         text_column=text_column,
         image_column=image_column,
-        image_dir=image_dir
+        image_dir=image_dir,
+        split=split
     )
     
     return DataLoader(

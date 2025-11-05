@@ -3,15 +3,15 @@ data_config:
   dataset_type: "custom"  # 指定使用自定义数据集
   num_workers: 4
   img_size: 224
-  data_path: "/jhcnas5/chenzhixuan/data/mimic_annotations.json"  # 自定义数据集文件路径
-  data_format: "json"  # 数据格式: "json", "csv", "txt", "folder"
-  image_dir: "/jhcnas4/kyle/Xray/DATA/MIMIC-CXR/files"  # 图像根目录路径
-  text_column: "report"  # 文本列名（用于json/csv格式）
-  image_column: "image_path"  # 图像路径列名（用于json/csv格式）
+  data_path: "/jhcnas4/XR/PadChest/labels/padchest_labels_grouped_exploded.csv"  # 自定义数据集文件路径
+  data_format: "csv"  # 数据格式: "json", "csv", "txt", "folder"
+  image_dir: "/jhcnas4/XR/PadChest/imgs-512"  # 图像根目录路径
+  text_column: "Translated_Report"  # 文本列名（用于json/csv格式）
+  image_column: "ImageID"  # 图像路径列名（用于json/csv格式）
   seed: 0
   patch_size: 1
   convert_to_rgb: False
-  dataset_name: "mimic"
+  dataset_name: "padchest"
 clip_config:
   clip_image_size: 224
   clip_dim: 768
@@ -19,7 +19,7 @@ clip_config:
 report_to: wandb
 scale_factor: 1.0   # scaled logit-normal sampling
 train_batch_size: 12
-output_dir: /jhcnas5/chenzhixuan/checkpoints/GenHancer/outputs/mimic_XRCLIP_224_stage1_new/
+output_dir: /jhcnas5/chenzhixuan/checkpoints/GenHancer/outputs/padchest_dataset_XRCLIP_224_stage1/
 # 训练配置 - 可以选择使用epoch数或步数
 num_train_epochs: 5  # 直接设置训练轮数，更直观
 # max_train_steps: 100000  # 或者使用步数（如果设置了epoch数，此选项会被忽略）
